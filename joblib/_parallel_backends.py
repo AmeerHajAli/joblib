@@ -9,6 +9,7 @@ import warnings
 import threading
 import functools
 import contextlib
+import ray
 from abc import ABCMeta, abstractmethod
 
 from .format_stack import format_exc
@@ -582,6 +583,81 @@ class LokyBackend(AutoBatchingMixin, ParallelBackendBase):
         if ensure_ready:
             self.configure(n_jobs=self.parallel.n_jobs, parallel=self.parallel)
 
+class RayBackend(ParallelBackendBase, AutoBatchingMixin):
+    """A ParallelBackend which will use a thread pool to execute batches in.
+        Ray backend uses ray, a system for scalable distributed computing
+        more info are available here: https://ray.readthedocs.io/
+    """
+    # not sure if these should be here
+    supports_timeout = True
+    #uses_threads = True
+    #supports_sharedmem = True
+    #supports_inner_max_num_threads = True
+    def __init__(self,**ray_kwargs):
+        
+        self.ray_kwargs = ray_kwargs
+        self.task_futures = set()
+    def effective_n_jobs(self, n_jobs):
+        """Determine the number of jobs which are going to run in parallel"""
+        if n_jobs == 0:
+            raise ValueError('n_jobs == 0 in Parallel has no meaning')
+        elif n_jobs is None: #mp is None or n_jobs is None:// not sure if necessary
+            # multiprocessing is not available or disabled, fallback
+            # to sequential mode
+            return 1
+        elif n_jobs < 0:
+            n_jobs = max(cpu_count() + 1 + n_jobs, 1)
+        return n_jobs
+
+    def get_nested_backend(self):
+        return RayBackend(ray_kwargs=self.ray_kwargs), -1
+
+    def configure(self, n_jobs=1, parallel=None, **backend_args):
+        """Build a process or thread pool and return the number of workers"""
+        n_jobs = self.effective_n_jobs(n_jobs)
+        if n_jobs == 1:
+            # Avoid unnecessary overhead and use sequential backend instead.
+            raise FallbackToBackend(
+                SequentialBackend(nesting_level=self.nesting_level))
+        #print(backend_args.items())
+        ray.init(num_cpus = n_jobs, **self.ray_kwargs)
+        self._n_jobs = n_jobs
+        return n_jobs
+    
+    def apply_async(self, func, callback=None):
+        """Schedule a func to be run"""
+        #print(func.items)
+        f,args,kwargs = func.items[0]
+        #registering the function
+        ray_f = ray.remote(lambda *args, **kwargs: f(*args,**kwargs))
+        
+        rayfuture = ray_f.remote(*args,**kwargs)
+        self.task_futures.add(rayfuture)
+
+        if callback is not None:    
+            callback(rayfuture)
+            self.task_futures.remove(rayfuture)
+        
+        # patch to make AsyncResult API work 
+        class Future:
+            def __init__(self,rayfuture):
+                self.rayfuture = rayfuture
+            def get(self,timeout=None):
+                if timeout:
+                    done_futures,remaining_futures = ray.wait([self.rayfuture],1,timeout)
+                    if not done_futures:
+                        raise TimeoutError()
+                result = ray.get(self.rayfuture)
+                return [result]
+
+        return Future(rayfuture)
+    
+    def abort_everything(self,ensure_ready=True):
+        #TODO: kill future jobs here
+        ray.shutdown()
+        self.task_futures.clear()
+        if ensure_ready:
+            self.configure(n_jobs=self._n_jobs)
 
 class ImmediateResult(object):
     def __init__(self, batch):
