@@ -73,9 +73,9 @@ def _register_dask():
         raise ImportError(msg)
 
 def _register_ray():
-    """ Register Dask Backend if called with parallel_backend("dask") """
+    """ Register Ray Backend if called with parallel_backend("ray") """
     try:
-        from ._parallel_backends import RayBackend
+        from ._ray import RayBackend
         register_parallel_backend('ray', RayBackend)
     except ImportError:
         msg = ("To use the ray backend you must install ray"
