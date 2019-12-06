@@ -1,3 +1,4 @@
+from __future__ import print_function, division, absolute_import
 import ray
 from .parallel import AutoBatchingMixin, ParallelBackendBase
 
@@ -15,24 +16,19 @@ class RayBackend(ParallelBackendBase, AutoBatchingMixin):
         
         self.ray_kwargs = ray_kwargs
         self.task_futures = set()
+        ray.init(**self.ray_kwargs)
 
     def effective_n_jobs(self, n_jobs):
         """Determine the number of jobs/workers which are going to run in parallel"""
-        if n_jobs <= 0:
-            raise ValueError('n_jobs <= 0 in ray Parallel has no meaning')
-        return n_jobs
+        return self.ray_kwargs.get('num_cpus')
 
     def get_nested_backend(self):
-        return RayBackend(ray_kwargs=self.ray_kwargs), -1
+        return self, -1
 
     def configure(self, n_jobs=1, parallel=None, **backend_args):
-        n_jobs = self.effective_n_jobs(n_jobs)
-        if n_jobs == 1:
-            # Avoid unnecessary overhead and use sequential backend instead.
-            raise FallbackToBackend(
-                SequentialBackend(nesting_level=self.nesting_level))
-        ray.init(num_cpus = n_jobs, **self.ray_kwargs)
-        self._n_jobs = n_jobs
+        n_jobs = self.effective_n_jobs(n_jobs)#n_jobs is basically num_cpus
+        if n_jobs == None: # no num_cpus was passed
+            n_jobs = 1
         return n_jobs
     
     def apply_async(self, func, callback=None):
@@ -65,4 +61,5 @@ class RayBackend(ParallelBackendBase, AutoBatchingMixin):
         ray.shutdown()
         self.task_futures.clear()
         if ensure_ready:
-            self.configure(n_jobs=self._n_jobs)
+            ray.init(**self.ray_kwargs)
+            self.configure()
