@@ -60,14 +60,15 @@ class RayBackend(ParallelBackendBase, AutoBatchingMixin):
         
         self.ray_kwargs = ray_kwargs
         self.task_futures = set()
-        if 'num_cpus' not in self.ray_kwargs:
-            self.ray_kwargs['num_cpus'] = 1
-        ray.init(ignore_reinit_error=True,**self.ray_kwargs)
+        if not ray.is_initialized():
+            ray.init(**self.ray_kwargs)
     
     def effective_n_jobs(self, n_jobs):
         """Determine the number of jobs/workers which are going 
         to run in parallel. Currently it ignores n_jobs and return num_cpus"""
-        return self.ray_kwargs.get('num_cpus')
+        ray_cpus = int(ray.state.cluster_resources()["CPU"])
+        #print(ray_cpus)
+        return ray_cpus
 
     def get_nested_backend(self):
         return self, -1
@@ -76,8 +77,6 @@ class RayBackend(ParallelBackendBase, AutoBatchingMixin):
         """n_jobs is basically managed by ray. 
         Make sure to define num_cpus in the init"""
         n_jobs = self.effective_n_jobs(n_jobs)
-        if n_jobs == None: 
-            n_jobs = 1
         return n_jobs
     
 
@@ -96,6 +95,6 @@ class RayBackend(ParallelBackendBase, AutoBatchingMixin):
         """ shuts down ray (and running jobs) and reinitializes the class """
         ray.shutdown()
         self.task_futures.clear()
-        if ensure_ready:
-            ray.init(**self.ray_kwargs)
-            self.configure()
+        #if ensure_ready:
+        #    ray.init(**self.ray_kwargs)
+        #    self.configure()
