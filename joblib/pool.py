@@ -35,8 +35,9 @@ from ._multiprocessing_helpers import mp, assert_spawning
 
 # We need the class definition to derive from it, not the multiprocessing.Pool
 # factory function
-from multiprocessing.pool import Pool
+from ray.experimental.multiprocessing.pool import Pool
 
+#from multiprocessing.pool import Pool
 try:
     import numpy as np
 except ImportError:
@@ -204,6 +205,7 @@ class PicklingPool(Pool):
         self._backward_reducers = backward_reducers
         poolargs = dict(processes=processes)
         poolargs.update(kwargs)
+        print(poolargs)
         super(PicklingPool, self).__init__(**poolargs)
 
     def _setup_queues(self):
