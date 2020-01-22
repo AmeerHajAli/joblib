@@ -241,7 +241,7 @@ class PoolManagerMixin(object):
         """Shutdown the process or thread pool"""
         if self._pool is not None:
             self._pool.close()
-            self._pool.terminate()  # terminate does a join()
+            #self._pool.terminate()  # terminate does a join()
             self._pool = None
 
     def _get_pool(self):
