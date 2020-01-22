@@ -82,7 +82,7 @@ ESTIMATORS = {
     "dummy": DummyClassifier(),
     'CART': DecisionTreeClassifier(),
     'ExtraTrees': ExtraTreesClassifier(),
-    'RandomForest': RandomForestClassifier(),
+    'RandomForest': RandomForestClassifier(n_estimators = 10000),
     'Nystroem-SVM': make_pipeline(
         Nystroem(gamma=0.015, n_components=1000), LinearSVC(C=100)),
     'SampledRBF-SVM': make_pipeline(
@@ -92,11 +92,11 @@ ESTIMATORS = {
     'LogisticRegression-SAGA': LogisticRegression(solver='saga', tol=1e-1,
                                                   C=1e4),
     'MultilayerPerceptron': MLPClassifier(
-        hidden_layer_sizes=(100, 100), max_iter=400, alpha=1e-4,
+        hidden_layer_sizes=(1000, 10000,1000), max_iter=400, alpha=1e-4,
         solver='sgd', learning_rate_init=0.2, momentum=0.9, verbose=1,
         tol=1e-4, random_state=1),
     'MLP-adam': MLPClassifier(
-        hidden_layer_sizes=(100, 100), max_iter=400, alpha=1e-4,
+        hidden_layer_sizes=(1000, 10000,1000), max_iter=400, alpha=1e-4,
         solver='adam', learning_rate_init=0.001, verbose=1,
         tol=1e-4, random_state=1)
 }
@@ -106,7 +106,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--classifiers', nargs="+",
                         choices=ESTIMATORS, type=str,
-                        default=ESTIMATORS.keys(),
+                        default=['RandomForest'],
                         help="list of classifiers to benchmark.")
     parser.add_argument('--n-jobs', nargs="?", default=1, type=int,
                         help="Number of concurrently running workers for "
